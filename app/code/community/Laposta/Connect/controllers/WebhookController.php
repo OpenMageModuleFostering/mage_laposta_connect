@@ -105,8 +105,6 @@ class Laposta_Connect_WebhookController extends Mage_Core_Controller_Front_Actio
      */
     protected function log($message, $data = null)
     {
-        var_dump($message, $data);
-
         Mage::helper('lapostaconnect')->log(
             array(
                 'message' => $message,
@@ -158,24 +156,41 @@ class Laposta_Connect_WebhookController extends Mage_Core_Controller_Front_Actio
             return $this->log("Customer for subscriber with laposta id '$memberId' not found.");
         }
 
+        /** @var $fieldsHelper Laposta_Connect_Helper_Fields */
+        $fieldsHelper = Mage::helper('lapostaconnect/Fields');
+        $fields       = $fieldsHelper->getByListId($subscriber->getListId());
+
+        /** @var $customerHelper Laposta_Connect_Helper_Customer */
+        $customerHelper = Mage::helper('lapostaconnect/customer');
+
+        $customerHelper->setCustomer($customer);
+        $customerHelper->email = $event['data']['email'];
+        foreach ($fields as $fieldName => $lapostaTag) {
+            $customerHelper->$fieldName = $event['data']['custom_fields'][$lapostaTag];
+        }
+
         /** @var $newsletterSubscriberModel Mage_Newsletter_Model_Subscriber */
         $newsletterSubscriberModel = Mage::getModel('newsletter/subscriber');
         /** @var $newsletterSubscriber Mage_Newsletter_Model_Subscriber */
         $newsletterSubscriber = $newsletterSubscriberModel->loadByCustomer($customer);
-
-        var_dump($newsletterSubscriber);
+        $newsletterSubscriber->setCustomerId($subscriber->getData('customer_id'));
+        $newsletterSubscriber->setEmail($customer->getEmail());
+        $newsletterSubscriber->setStoreId($customer->getStore()->getId());
 
         if ($status !== 'active') {
+            $customer->setIsSubscribed(false);
             $newsletterSubscriber->unsubscribe();
 
-            return $this->log("Customer '{$customer->getEmail()}' for subscriber with laposta id '$memberId' has been unsubscribed.");
+            $this->log("Customer '{$customer->getEmail()}' for subscriber with laposta id '$memberId' has been unsubscribed.");
+        }
+        else {
+            $customer->setIsSubscribed(true);
+            $newsletterSubscriber->subscribeCustomer($customer);
 
-            return $this;
+            $this->log("Customer '{$customer->getEmail()}' for subscriber with laposta id '$memberId' has been subscribed.");
         }
 
-        $newsletterSubscriber->subscribe($customer->getEmail());
-
-        return $this->log("Customer '{$customer->getEmail()}' for subscriber with laposta id '$memberId' has been subscribed.");
+        $customer->save();
 
         return $this;
     }
