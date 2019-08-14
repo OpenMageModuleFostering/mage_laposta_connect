@@ -19,8 +19,15 @@ class Laposta_Connect_Helper_Subscribe extends Mage_Core_Helper_Abstract
             $customerId            = $nativeSubscriber->getCustomerId();
             $nativeSubscriberId    = $nativeSubscriber->getId();
             $nativeSubscriberEmail = $nativeSubscriber->getEmail();
+            $exists                = ($customerId != "0" && isset($customerIdList[$customerId])) ||
+                                     isset($subscriberIdList[$nativeSubscriberId]) ||
+                                     isset($emailList[$nativeSubscriberEmail]);
 
-            if (isset($customerIdList[$customerId]) || isset($subscriberIdList[$nativeSubscriberId]) || isset($emailList[$nativeSubscriberEmail])) {
+            $customerIdList[$customerId]           = 1;
+            $subscriberIdList[$nativeSubscriberId] = 1;
+            $emailList[$nativeSubscriberEmail]     = 1;
+
+            if ($exists) {
                 continue;
             }
 

@@ -222,7 +222,7 @@ class Laposta_Connect_Model_Observer
     protected function handleSaveListConfig()
     {
         $listName           = Mage::helper('lapostaconnect')->config('list_name');
-        $subscribeCustomers = false;
+        $subscribeCustomers = true;
 
         /** @var $lists Laposta_Connect_Model_Mysql4_List_Collection */
         $lists = Mage::getModel('lapostaconnect/list')->getCollection();
