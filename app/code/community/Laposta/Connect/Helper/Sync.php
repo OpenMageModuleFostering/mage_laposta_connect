@@ -13,23 +13,23 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
      * )
      */
     protected $fieldConfigMap = array(
-        'dob'              => array(
+        'dob'                 => array(
             'type' => Laposta_Connect_Helper_Laposta::FIELD_TYPE_DATE,
         ),
-        'gender'           => array(
+        'gender'              => array(
             'type'    => Laposta_Connect_Helper_Laposta::FIELD_TYPE_SELECT_SINGLE,
             'options' => array('', 'Male', 'Female'),
         ),
-        'store_id'         => array(
+        'store_id'            => array(
             'type' => Laposta_Connect_Helper_Laposta::FIELD_TYPE_NUMERIC,
         ),
-        'website_id'       => array(
+        'website_id'          => array(
             'type' => Laposta_Connect_Helper_Laposta::FIELD_TYPE_NUMERIC,
         ),
-        'date_of_purchase' => array(
+        'date_of_purchase'    => array(
             'type' => Laposta_Connect_Helper_Laposta::FIELD_TYPE_DATE,
         ),
-        'group_id'         => array(
+        'group_id'            => array(
             'type' => Laposta_Connect_Helper_Laposta::FIELD_TYPE_NUMERIC,
         ),
     );
@@ -63,8 +63,6 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
      */
     public function syncList(Laposta_Connect_Model_List $list)
     {
-        $this->log(__METHOD__, "Starting to sync list: " . $list->getListName());
-
         if (Mage::helper('lapostaconnect')->config('active') !== '1') {
             return $this;
         }
@@ -83,27 +81,21 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
         if (empty($listName)) {
             $listName = '(Empty List Name - Magento)';
 
-            $this->log('Creating new list', $listName);
-
             $list->setListName($listName);
         }
 
         if (empty($lapostaId)) {
-            $this->log("Creating new list", $listName);
-
             $lapostaId = $laposta->addGroup($listName);
 
             $list->setLapostaId($lapostaId);
         }
         else {
-            $this->log('Updating list', array('listName' => $listName, 'lapostId' => $lapostaId));
-
             $laposta->updateGroup($lapostaId, $listName);
         }
 
         $this->resetWebhooks($list);
 
-        $list->setSyncTime(date('Y-m-d H:i:s'));
+        $list->setSyncTime(Mage::getModel('lapostaconnect/list')->getCollection()->formatDate(time()));
 
         return $this;
     }
@@ -222,7 +214,7 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
             }
 
             $field->setLapostaTag(trim($lapostaFieldTag, '{}'));
-            $field->setSyncTime(date('Y-m-d H:i:s'));
+            $field->setSyncTime($fields->formatDate(time()));
         }
 
         $remove = array_diff($current, $synchronised);
@@ -274,7 +266,7 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
         $result = array();
 
         foreach ($current as $field) {
-            if (!isset($field['field']['field_id']) || !empty($field['field']['is_email'])) {
+            if (!isset($field['field']['field_id'])) {
                 continue;
             }
 
@@ -282,22 +274,6 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
         }
 
         return $result;
-    }
-
-    /**
-     * Resolve the list of status codes considered active
-     *
-     * @return array
-     */
-    protected function resolveSubscriberStatusWhiteList()
-    {
-        $statusWhiteList = array(Mage_Newsletter_Model_Subscriber::STATUS_SUBSCRIBED);
-
-        if (Mage::helper('lapostaconnect')->config('subscribe_unconfirmed') === '1') {
-            $statusWhiteList[] = Mage_Newsletter_Model_Subscriber::STATUS_UNCONFIRMED;
-        }
-
-        return $statusWhiteList;
     }
 
     /**
@@ -332,40 +308,25 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
         /** @var $fieldsHelper Laposta_Connect_Helper_Fields */
         $fieldsHelper = Mage::helper('lapostaconnect/Fields');
 
-        /** @var $nativeSubscribers Mage_Newsletter_Model_Mysql4_Subscriber_Collection */
-        $nativeSubscribers = Mage::getModel('newsletter/subscriber')->getCollection();
+        /** @var $newsletterSubscribers Mage_Newsletter_Model_Mysql4_Subscriber_Collection */
+        $newsletterSubscribers = Mage::getModel('newsletter/subscriber')->getCollection();
 
         /** @var $subscriber Laposta_Connect_Model_Subscriber */
         foreach ($subscribers as $subscriber) {
-            $customerId         = $subscriber->getCustomerId();
-            $lapostaMemberId    = $subscriber->getLapostaId();
-            $nativeSubscriberId = $subscriber->getNewsletterSubscriberId();
-            $lapostaListId      = $listIdMap[$subscriber->getListId()];
-            $nativeSubscriber   = $nativeSubscribers->getItemById($nativeSubscriberId);
+            $customerId      = $subscriber->getCustomerId();
+            $lapostaMemberId = $subscriber->getLapostaId();
+            $lapostaListId   = $listIdMap[$subscriber->getListId()];
 
-            if (!$nativeSubscriber instanceof Mage_Newsletter_Model_Subscriber || $nativeSubscriber->isEmpty()) {
-                $nativeSubscriber = $nativeSubscribers->getItemByColumnValue('customer_id', $customerId);
-            }
-
-            if ((empty($customerId) && empty($nativeSubscriberId)) || !$nativeSubscriber instanceof Mage_Newsletter_Model_Subscriber || $nativeSubscriber->isEmpty()) {
-                if (!empty($lapostaMemberId)) {
-                    $laposta->removeContact($lapostaListId, $lapostaMemberId);
-                }
-
-                $subscriber->delete();
+            if (empty($customerId) && empty($lapostaMemberId)) {
+                $subscriber->delete($subscriber);
 
                 continue;
             }
 
-            /*
-             * Resolve the subscriber core data values
-             */
-
-            $email      = $nativeSubscriber->getEmail();
-            $subscribed = in_array($nativeSubscriber->getData('subscriber_status'), $this->resolveSubscriberStatusWhiteList()) ? true : false;
-            $data       = array();
-
-            if ($customerId != "0") {
+            if (empty($customerId)) {
+                $laposta->removeContact($lapostaListId, $lapostaMemberId);
+            }
+            else {
                 /** @var $customer Mage_Customer_Model_Customer */
                 $customer = Mage::getModel('customer/customer')->load($customerId);
                 /** @var $customerHelper Laposta_Connect_Helper_Customer */
@@ -377,20 +338,33 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
                     array_values($fields),
                     array_values($customerHelper->resolve(array_keys($fields)))
                 );
-            }
 
-            if (empty($lapostaMemberId)) {
-                $subscriber->setData(
-                    'laposta_id',
-                    $laposta->addContact($lapostaListId, '', $email, $data, $subscribed)
-                );
-            }
-            else {
-                $laposta->updateContact($lapostaListId, $lapostaMemberId, '', $email, $data, $subscribed);
-            }
+                $newsletter = $newsletterSubscribers->getItemByColumnValue('customer_id', $customerId);
+                $subscribed = false;
 
-            $subscriber->setSyncTime(date('Y-m-d H:i:s'));
-            $subscriber->save();
+                if ($newsletter instanceof Mage_Newsletter_Model_Subscriber) {
+                    $status          = $newsletter->getData('subscriber_status');
+                    $statusWhiteList = array(Mage_Newsletter_Model_Subscriber::STATUS_SUBSCRIBED);
+
+                    if (Mage::helper('lapostaconnect')->config('subscribe_unconfirmed') === '1') {
+                        $statusWhiteList[] = Mage_Newsletter_Model_Subscriber::STATUS_UNCONFIRMED;
+                    }
+
+                    $subscribed = in_array($status, $statusWhiteList) ? true : false;
+                }
+
+                if (empty($lapostaMemberId)) {
+                    $lapostaId = $laposta->addContact($lapostaListId, '', $customer->getEmail(), $data, $subscribed);
+
+                    $subscriber->setData('laposta_id', $lapostaId);
+                }
+                else {
+                    $laposta->updateContact($lapostaListId, $lapostaMemberId, '', $customer->getEmail(), $data, $subscribed);
+                }
+
+                $subscriber->setSyncTime($subscribers->formatDate(time()));
+                $subscriber->save();
+            }
         }
 
         foreach ($listIdMap as $lapostaListId) {
@@ -398,19 +372,5 @@ class Laposta_Connect_Helper_Sync extends Mage_Core_Helper_Abstract
         }
 
         return $this;
-    }
-
-    protected function log($method, $message, $result = array())
-    {
-        $logData = array(
-            'method'  => $method,
-            'message' => $message,
-        );
-
-        if (!empty($result)) {
-            $logData['result'] = $result;
-        }
-
-        Mage::helper('lapostaconnect')->log($logData);
     }
 }

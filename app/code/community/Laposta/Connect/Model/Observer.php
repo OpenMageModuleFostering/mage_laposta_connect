@@ -29,16 +29,23 @@ class Laposta_Connect_Model_Observer
         $collection = Mage::getModel('lapostaconnect/subscriber')->getCollection();
         $subscriber = $collection->getItemByColumnValue('customer_id', $customer->getId());
 
-        if (!$subscriber instanceof Laposta_Connect_Model_Subscriber || $subscriber->isEmpty()) {
-            /*
-             * Nothing to do.
-             */
+        if (!$subscriber instanceof Laposta_Connect_Model_Subscriber) {
+            /** @var $lists Laposta_Connect_Model_Mysql4_List_Collection */
+            $lists = Mage::getModel('lapostaconnect/list')->getCollection();
+            /** @var $list Laposta_Connect_Model_List */
+            $list = $lists->setOrder('list_id')->getFirstItem();
 
-            return;
+            if (!$list instanceof Laposta_Connect_Model_List) {
+                return;
+            }
+
+            $subscriber = $collection->getNewEmptyItem();
+            $subscriber->setListId($list->getListId());
+            $subscriber->setCustomerId($customer->getEntityId());
         }
 
         if ($subscriber->getData('customer_id') != '') {
-            $subscriber->setUpdatedTime(date('Y-m-d H:i:s'));
+            $subscriber->setUpdatedTime($collection->formatDate(time()));
             $subscriber->save();
         }
     }
@@ -52,125 +59,22 @@ class Laposta_Connect_Model_Observer
      */
     public function handleCustomerDelete(Varien_Event_Observer $observer)
     {
-        /*
-         * method is now obsolete.
-         *
-         * Subscriber removal is handle through newsletter_subscriber_delete_after event.
-         */
-    }
+        $customer = $observer->getEvent()->getCustomer();
 
-    /**
-     * Handle subscribe event
-     *
-     * @param Varien_Event_Observer $observer
-     */
-    public function handleNewsletterSubscriberSave(Varien_Event_Observer $observer)
-    {
-        /** @var $nativeSubscriber Mage_Newsletter_Model_Subscriber */
-        $nativeSubscriber = $observer->getEvent()->getSubscriber();
-
-        if (!$nativeSubscriber instanceof Mage_Newsletter_Model_Subscriber) {
+        if (!$customer instanceof Mage_Customer_Model_Customer) {
             return;
         }
 
         /** @var $collection Laposta_Connect_Model_Mysql4_Subscriber_Collection */
         $collection = Mage::getModel('lapostaconnect/subscriber')->getCollection();
-
-        /*
-         * find laposta subscriber by subscriber id
-         */
-
-        /** @var $subscriber Laposta_Connect_Model_Subscriber */
-        $subscriber = $collection->getItemByColumnValue('newsletter_subscriber_id', $nativeSubscriber->getId());
-        $customerId = $nativeSubscriber->getCustomerId();
-
-        if ($subscriber instanceof Laposta_Connect_Model_Subscriber && !$subscriber->isEmpty()) {
-            /*
-             * Subscriber already exists. No need to continue.
-             */
-            return;
-        }
-        else if ($customerId != "0") {
-            /*
-             * if not found and customer id is not '0' it could be a legacy record
-             */
-            $subscriber = $collection->getItemByColumnValue('customer_id', $customerId);
-        }
-
-        if ($subscriber instanceof Laposta_Connect_Model_Subscriber && !$subscriber->isEmpty()) {
-            /*
-             * If subscriber is found then update the newsletter subscriber id
-             */
-            $subscriber->setNewsletterSubscriberId($nativeSubscriber->getId());
-            $subscriber->save();
-        }
-        else {
-            /*
-             * if subscriber still doesn't exist then it really doesn't exist yet.
-             */
-            /** @var $lists Laposta_Connect_Model_Mysql4_List_Collection */
-            $lists = Mage::getModel('lapostaconnect/list')->getCollection();
-            /** @var $list Laposta_Connect_Model_List */
-            $list = $lists->setOrder('list_id')->getFirstItem();
-
-            if (!$list instanceof Laposta_Connect_Model_List) {
-                return;
-            }
-
-            $subscriber = $collection->getNewEmptyItem();
-            $subscriber->setListId($list->getListId());
-            $subscriber->setCustomerId($customerId);
-            $subscriber->setNewsletterSubscriberId($nativeSubscriber->getId());
-            $subscriber->setUpdatedTime(date('Y-m-d H:i:s'));
-            $subscriber->save();
-        }
-    }
-
-    /**
-     * Handle subscriber delete event
-     *
-     * @param Varien_Event_Observer $observer
-     */
-    public function handleNewsletterSubscriberDelete(Varien_Event_Observer $observer)
-    {
-        /** @var $nativeSubscriber Mage_Newsletter_Model_Subscriber */
-        $nativeSubscriber = $observer->getEvent()->getSubscriber();
-
-        if (!$nativeSubscriber instanceof Mage_Newsletter_Model_Subscriber) {
-            return;
-        }
-
-
-        /** @var $collection Laposta_Connect_Model_Mysql4_Subscriber_Collection */
-        $collection = Mage::getModel('lapostaconnect/subscriber')->getCollection();
-        $customerId = $nativeSubscriber->getCustomerId();
-
-        /*
-         * find laposta subscriber by subscriber id
-         */
-
-        /** @var $subscriber Laposta_Connect_Model_Subscriber */
-        $subscriber = $collection->getItemByColumnValue('newsletter_subscriber_id', $nativeSubscriber->getId());
-
-        /*
-         * if not found and customer id is not '0' it could be a legacy record
-         */
-
-        if ($customerId != "0" && (!$subscriber instanceof Laposta_Connect_Model_Subscriber || $subscriber->isEmpty())) {
-            $subscriber = $collection->getItemByColumnValue('customer_id', $customerId);
-        }
-
-        /*
-         * if subscriber still doesn't exist then it really doesn't exist yet.
-         */
+        $subscriber = $collection->getItemsByColumnValue('customer_id', $customer->getEntityId());
 
         if (!$subscriber instanceof Laposta_Connect_Model_Subscriber || $subscriber->isEmpty()) {
             return;
         }
 
         $subscriber->setCustomerId('');
-        $subscriber->setNewsletterSubscriberId('');
-        $subscriber->setUpdatedTime(date('Y-m-d H:i:s'));
+        $subscriber->setUpdatedTime($collection->formatDate(time()));
         $subscriber->save();
     }
 
@@ -222,7 +126,7 @@ class Laposta_Connect_Model_Observer
     protected function handleSaveListConfig()
     {
         $listName           = Mage::helper('lapostaconnect')->config('list_name');
-        $subscribeCustomers = true;
+        $subscribeCustomers = false;
 
         /** @var $lists Laposta_Connect_Model_Mysql4_List_Collection */
         $lists = Mage::getModel('lapostaconnect/list')->getCollection();
@@ -237,7 +141,7 @@ class Laposta_Connect_Model_Observer
         }
 
         $list->setListName($listName);
-        $list->setUpdatedTime(date('Y-m-d H:i:s'));
+        $list->setUpdatedTime($lists->formatDate(time()));
 
         /*
          * Save here to ensure list_id is generated for new list entries
@@ -295,7 +199,7 @@ class Laposta_Connect_Model_Observer
             }
 
             $field->setFieldRelation($fieldsMap[$fieldName]);
-            $field->setUpdatedTime(date('Y-m-d H:i:s'));
+            $field->setUpdatedTime($fields->formatDate(time()));
             $updated[$fieldName] = $field;
         }
 
@@ -309,7 +213,7 @@ class Laposta_Connect_Model_Observer
             $field->setListId($list->getListId());
             $field->setFieldName($fieldName);
             $field->setFieldRelation($fieldRelation);
-            $field->setUpdatedTime(date('Y-m-d H:i:s'));
+            $field->setUpdatedTime($fields->formatDate(time()));
 
             $fields->addItem($field);
             $added[$fieldName] = $field;

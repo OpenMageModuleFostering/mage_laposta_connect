@@ -45,11 +45,7 @@ class Laposta_Connect_Helper_Customer extends Mage_Core_Helper_Abstract
     /**
      * @var array
      */
-    protected $methodMapSet = array(
-        'gender'           => 'setGender',
-        'telephone'        => 'setTelephone',
-        'company'          => 'setCompany',
-    );
+    protected $methodMapSet = array();
 
     /**
      * @var array
@@ -159,7 +155,7 @@ class Laposta_Connect_Helper_Customer extends Mage_Core_Helper_Abstract
         }
 
         if (!isset($this->methodMapSet[$name])) {
-            return $this->setCustomerAttribute($name, $value);
+            return $this;
         }
 
         $method = $this->methodMapSet[$name];
@@ -266,31 +262,6 @@ class Laposta_Connect_Helper_Customer extends Mage_Core_Helper_Abstract
     }
 
     /**
-     * Set the textual customer gender
-     *
-     * @return string
-     */
-    protected function setGender($value)
-    {
-        $options  = $this->getCustomer()->getAttribute('gender')->getSource()->getAllOptions(false);
-        $genderId = '';
-
-        foreach ($options as $option) {
-            if ($option['label'] != $value) {
-                continue;
-            }
-
-            $genderId = $option['value'];
-
-            break;
-        }
-
-        $this->setCustomerAttribute('gender', $genderId);
-
-        return $this;
-    }
-
-    /**
      * Get the date of the customers last order
      *
      * @return string
@@ -326,22 +297,6 @@ class Laposta_Connect_Helper_Customer extends Mage_Core_Helper_Abstract
     }
 
     /**
-     * Set the customer telephone number
-     *
-     * @return string
-     */
-    protected function setTelephone($value)
-    {
-        $address = $this->getCustomer()->getPrimaryBillingAddress();
-
-        if (!$address instanceof Mage_Customer_Model_Address) {
-            return '';
-        }
-
-        return $address->setData('telephone', $value);
-    }
-
-    /**
      * Get the customer company name
      *
      * @return string
@@ -355,22 +310,6 @@ class Laposta_Connect_Helper_Customer extends Mage_Core_Helper_Abstract
         }
 
         return $address->getData('company');
-    }
-
-    /**
-     * Set the customer company name
-     *
-     * @return string
-     */
-    protected function setCompany($value)
-    {
-        $address = $this->getCustomer()->getPrimaryBillingAddress();
-
-        if (!$address instanceof Mage_Customer_Model_Address) {
-            return '';
-        }
-
-        return $address->setData('company', $value);
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 
-require_once dirname(dirname(__FILE__)) . '/lib/Laposta/Laposta.php';
+require_once Mage::getBaseDir('lib') . '/Laposta/Laposta.php';
 
 class Laposta_Connect_Helper_Laposta extends Mage_Core_Helper_Abstract
 {
@@ -86,14 +86,11 @@ class Laposta_Connect_Helper_Laposta extends Mage_Core_Helper_Abstract
             'state'         => $subscribed ? 'active' : 'unsubscribed',
             'custom_fields' => $this->denormalizeFields($listId, $fields),
         );
-
-        $this->log(__METHOD__ . ' Sending: ', $data);
-
         $result = $member->create($data);
 
-        $this->log(__METHOD__ . ' Received: ', $result);
+        $this->log(__METHOD__, $result);
 
-        return (isset($result['member']['member_id'])) ? $result['member']['member_id'] : "";
+        return $result['member']['member_id'];
     }
 
     /**
@@ -539,12 +536,6 @@ class Laposta_Connect_Helper_Laposta extends Mage_Core_Helper_Abstract
         return $this;
     }
 
-    /**
-     * Log stuff
-     *
-     * @param string $method
-     * @param array  $result
-     */
     protected function log($method, $result = array())
     {
         Mage::helper('lapostaconnect')->log(
@@ -558,18 +549,11 @@ class Laposta_Connect_Helper_Laposta extends Mage_Core_Helper_Abstract
     /**
      * Remove a contact
      *
-     * @param string $listId
-     * @param string $memberId
-     *
-     * @return $this
+     * @param $listId
+     * @param $memberId
      */
     public function removeContact($listId, $memberId)
     {
-        $member = new Laposta_Member($listId);
-        $result = $member->delete($memberId);
 
-        $this->log(__METHOD__, $result);
-
-        return $this;
     }
-}
+} 
