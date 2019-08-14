@@ -1,0 +1,16 @@
+{
+    "name": "OpenMageModuleFostering/Mage_Laposta_Connect",
+    "type": "magento-module",
+    "license": "OSL-v3.0",
+    "homepage": "",
+    "description": "Synchronise customers that are subscribed to your newsletter with your Laposta email marketing account.",
+    "authors": [
+    {
+        "name": "Merten van Gerven",
+        "email": "merten@codeblanche.com"
+    }
+],
+    "suggest": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}
