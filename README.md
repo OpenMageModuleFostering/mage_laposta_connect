@@ -1,3 +1,5 @@
+
+
 ## Original Package Description
 
 Synchronise customers that are subscribed to your newsletter with your Laposta email marketing account.
